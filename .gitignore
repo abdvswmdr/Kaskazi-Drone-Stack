@@ -1,0 +1,41 @@
+# ROS2 Build Artifacts
+build/
+install/
+log/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Gazebo
+*~
+
+# ArduPilot/SITL logs and params
+*.log
+*.tlog*
+*.bin
+*.BIN
+eeprom.bin
+mav.parm*
+terrain/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.temp
+
+# Backup files
+*.bak
+*.backup
