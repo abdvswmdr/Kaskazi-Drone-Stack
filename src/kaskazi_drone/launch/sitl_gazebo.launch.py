@@ -45,11 +45,7 @@ def generate_launch_description():
     ardupilot_sitl = ExecuteProcess(
         cmd=[
             'bash', '-c',
-            f'cd ~/ardupilot/ArduCopter && ' +
-            f'../Tools/autotest/sim_vehicle.py ' +
-            f'--vehicle {vehicle} ' +
-            f'--frame {frame} ' +
-            f'--console --map --dds'
+            ['cd ~/ardupilot/ArduCopter && ../Tools/autotest/sim_vehicle.py --vehicle ', vehicle, ' --frame ', frame, ' --console --map --dds']
         ],
         output='screen',
         shell=True

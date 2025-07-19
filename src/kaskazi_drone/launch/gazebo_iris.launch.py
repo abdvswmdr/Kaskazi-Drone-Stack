@@ -10,6 +10,7 @@ Usage:
 
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, ExecuteProcess, IncludeLaunchDescription
+from launch.conditions import IfCondition
 from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
 from launch_ros.substitutions import FindPackageShare
 from launch.launch_description_sources import PythonLaunchDescriptionSource
@@ -43,7 +44,7 @@ def generate_launch_description():
     gazebo_client = ExecuteProcess(
         cmd=['gz', 'sim', '-g'],
         output='screen',
-        condition=f'{gui}'
+        condition=IfCondition(gui)
     )
     
     # Spawn Iris model (when ArduPilot plugin configured)
