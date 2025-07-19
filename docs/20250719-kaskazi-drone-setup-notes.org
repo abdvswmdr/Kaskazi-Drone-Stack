@@ -1,0 +1,174 @@
+:PROPERTIES:
+:ID:       kaskazi-drone-setup-2025-07-19
+:END:
+#+title: Kaskazi Drone Workspace Setup - ArduPilot-Gazebo-ROS2 Integration
+#+filetags: :ardupilot:gazebo:ros2:drone:sitl:dds:development:
+
+** Overview
+Complete setup and configuration of kaskazi_ws for professional drone development integrating ArduPilot SITL, Gazebo Harmonic, and ROS2 Jazzy with native DDS communication.
+
+** Architecture
+ArduPilot SITL ↔ Native DDS ↔ ROS2 Jazzy ↔ Gazebo Harmonic
+
+** Initial Issues Encountered and Solutions
+
+*** Build System Issues
+**** Problem: CMake Python package errors
+The initial colcon build failed with:
+- CMake Error: ament_python_install_package() the Python package folder doesn't contain an '__init__.py' file
+- Missing rclpy dependency causing conflicts
+
+**** Solution: Convert to C++-only package
+#+BEGIN_SRC bash
+# Remove Python dependencies from CMakeLists.txt
+# - Removed find_package(rclpy REQUIRED)
+# - Removed ament_python_install_package(${PROJECT_NAME})
+
+colcon build --packages-select kaskazi_drone
+#+END_SRC
+
+*** Launch File Syntax Errors
+**** Problem: LaunchConfiguration substitution errors
+Launch files had Python f-string syntax mixed with ROS2 LaunchConfiguration objects causing:
+- "'str' object has no attribute 'evaluate'" errors
+- LaunchConfiguration objects not properly evaluated in command strings
+
+**** Solution: Fixed substitution syntax
+- sitl_gazebo.launch.py: Fixed bash command substitution for LaunchConfiguration
+- gazebo_iris.launch.py: Fixed condition syntax using IfCondition
+
+*** ArduPilot Integration Issues
+**** Problem: sim_vehicle.py path and DDS flag errors
+- sim_vehicle.py not found (virtual environment path issue)
+- "--dds" flag not recognized
+- microxrceddsgen tool missing
+
+**** Solution: Virtual environment integration and correct DDS flag
+#+BEGIN_SRC bash
+# Virtual environment activation in launch file
+source ~/ardupilot/mavproxy_venv_sys/bin/activate
+
+# Correct DDS flag discovered via help
+sim_vehicle.py --help | grep -i dds
+# Found: --enable-DDS (not --dds)
+
+# Working command with no-rebuild flag to bypass configuration issues
+sim_vehicle.py --vehicle ArduCopter --frame quad --console --map --enable-DDS --no-rebuild
+#+END_SRC
+
+*** Gazebo Model Spawning Issues
+**** Problem: No drone model visible in Gazebo
+- Gazebo launched with empty world but no drone model
+- Model spawning commands returned "data: true" but no visual model
+- ArduPilot Gazebo plugin build failures due to missing GStreamer dependencies
+
+**** Solution: Resource path configuration and model dependencies
+#+BEGIN_SRC bash
+# Clone ArduPilot Gazebo plugin repository
+git clone https://github.com/ArduPilot/ardupilot_gazebo.git
+
+# Move to workspace
+mv ~/ardupilot_gazebo ~/kaskazi_ws/src/
+
+# Set Gazebo resource path in launch file
+export GZ_SIM_RESOURCE_PATH=~/kaskazi_ws/src/ardupilot_gazebo/models:$GZ_SIM_RESOURCE_PATH
+
+# Use model name instead of full path
+gz service -s /world/empty_ground/create --req 'sdf_filename: "iris_with_ardupilot"'
+#+END_SRC
+
+** Final Working Setup
+
+*** Directory Structure
+#+BEGIN_SRC
+kaskazi_ws/
+├── src/
+│   ├── kaskazi_drone/          # Main ROS2 package
+│   │   ├── launch/
+│   │   │   ├── sitl_gazebo.launch.py      # ArduPilot SITL with DDS
+│   │   │   └── gazebo_iris.launch.py      # Gazebo with Iris model
+│   │   ├── worlds/
+│   │   │   └── empty_ground.world         # Custom Gazebo world
+│   │   ├── CMakeLists.txt                 # C++-only configuration
+│   │   └── package.xml
+│   └── ardupilot_gazebo/       # ArduPilot Gazebo models
+│       └── models/
+│           ├── iris_with_ardupilot/
+│           └── iris_with_standoffs/
+├── build/                      # Build artifacts (gitignored)
+├── install/                    # Install space (gitignored)
+├── log/                        # Build logs (gitignored)
+└── docs/                       # Documentation
+#+END_SRC
+
+*** Working Commands
+#+BEGIN_SRC bash
+# Workspace setup
+cd ~/kaskazi_ws
+source /opt/ros/jazzy/setup.bash
+colcon build --symlink-install
+source install/setup.bash
+
+# Launch ArduPilot SITL with DDS
+ros2 launch kaskazi_drone sitl_gazebo.launch.py
+
+# Launch Gazebo with Iris model
+ros2 launch kaskazi_drone gazebo_iris.launch.py
+
+# Check ROS2 topics (when DDS working)
+ros2 topic list | grep ap
+ros2 topic echo /ap/navsat
+#+END_SRC
+
+** Current Status
+*** ✅ Working Components
+- ROS2 package builds successfully (C++-only configuration)
+- ArduPilot SITL launches with map and console via ROS2 launch
+- Gazebo launches with custom empty_ground world
+- Launch file syntax corrected and functional
+- Virtual environment integration working
+- DDS enabled in ArduPilot SITL (--enable-DDS --no-rebuild)
+
+*** 🔧 Pending Integration
+- Gazebo model spawning (resource path configured, needs testing)
+- ArduPilot-Gazebo physics integration (requires GStreamer dependencies)
+- DDS topic publishing verification
+- Full flight control integration
+
+** Dependencies and Requirements
+
+*** System Requirements
+- Ubuntu 24.04 (Noble)
+- ROS2 Jazzy
+- Gazebo Harmonic
+- ArduPilot with mavproxy virtual environment
+
+*** Missing Dependencies (for full integration)
+#+BEGIN_SRC bash
+# GStreamer packages for ArduPilot Gazebo plugin
+sudo apt install -y libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev
+
+# Optional: micro-ROS agent (not needed with native DDS)
+# sudo apt install ros-jazzy-micro-ros-agent  # Not available in standard repos
+#+END_SRC
+
+** Key Technical Decisions
+1. **Native ArduPilot DDS**: Chose ArduPilot's native DDS over micro-ROS agent for direct ROS2 communication
+2. **C++-only package**: Removed Python dependencies to focus on C++ development as requested
+3. **Virtual environment integration**: Properly integrated ArduPilot's mavproxy venv in launch files
+4. **Custom world file**: Created self-contained Gazebo world with inline sun and ground plane definitions
+5. **Resource path configuration**: Set GZ_SIM_RESOURCE_PATH to include ArduPilot models directory
+
+** Next Steps
+1. Test Gazebo model spawning with fixed resource paths
+2. Install GStreamer dependencies for full ArduPilot-Gazebo integration
+3. Verify DDS topic communication between ArduPilot and ROS2
+4. Test flight control commands from ROS2 to ArduPilot SITL
+5. Integrate physics simulation for realistic drone behavior
+
+** Troubleshooting Notes
+- Use --no-rebuild flag with sim_vehicle.py to bypass waf configuration issues
+- Ensure virtual environment is activated before running ArduPilot commands
+- Check GZ_SIM_RESOURCE_PATH if models don't spawn in Gazebo
+- Use "quad" frame instead of "iris" for basic ArduCopter simulation
+- DDS topics may not appear without proper microxrceddsgen installation

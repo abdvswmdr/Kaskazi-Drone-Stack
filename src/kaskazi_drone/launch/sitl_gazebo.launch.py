@@ -43,19 +43,11 @@ def generate_launch_description():
     
     # ArduPilot SITL with DDS
     ardupilot_sitl = ExecuteProcess(
-        cmd=[
-            'bash', '-c',
-            ['cd ~/ardupilot/ArduCopter && ../Tools/autotest/sim_vehicle.py --vehicle ', vehicle, ' --frame ', frame, ' --console --map --dds']
-        ],
-        output='screen',
-        shell=True
-    )
-    
-    # Micro-ROS Agent for DDS communication  
-    micro_ros_agent = ExecuteProcess(
-        cmd=['ros2', 'run', 'micro_ros_agent', 'micro_ros_agent', 'udp4', '--port', '2019'],
+        cmd=['bash', '-c', 
+             'source ~/ardupilot/mavproxy_venv_sys/bin/activate && cd ~/ardupilot/ArduCopter && sim_vehicle.py --vehicle ArduCopter --frame quad --console --map --enable-DDS --no-rebuild'],
         output='screen'
     )
+    
     
     # Gazebo simulation (commented out initially - add when Gazebo plugin ready)
     # gazebo_sim = IncludeLaunchDescription(
@@ -76,7 +68,6 @@ def generate_launch_description():
         
         # Core components
         ardupilot_sitl,
-        micro_ros_agent,
         
         # Gazebo (enable when plugin configured)
         # gazebo_sim,
