@@ -189,6 +189,12 @@ GridCoordinate AStar::gps_to_grid(const GPSCoordinate& gps, const GPSCoordinate&
   int grid_y = home_grid.y + static_cast<int>(std::round(y_meters));
   int grid_z = home_grid.z + static_cast<int>(std::round(z_meters));
   
+  // Clamp coordinates to grid bounds (assuming grid dimensions are available via grid_)
+  // For safety, we'll clamp to reasonable bounds
+  grid_x = std::max(0, std::min(grid_x, 14));  // 0-14 for 15x15 grid
+  grid_y = std::max(0, std::min(grid_y, 14));  // 0-14 for 15x15 grid  
+  grid_z = std::max(0, std::min(grid_z, 14));  // 0-14 for 15x15 grid
+  
   return GridCoordinate(grid_x, grid_y, grid_z);
 }
 

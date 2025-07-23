@@ -86,10 +86,10 @@ private:
   GridCoordinate home_grid_;    // Home position in grid coordinates
   std::vector<GridCoordinate> obstacles_;  // List of obstacles in grid coordinates
   
-  // Grid dimensions
-  int grid_rows_ = 10;
-  int grid_cols_ = 10;
-  int grid_height_ = 10;
+  // Grid dimensions (increased to handle larger goals)
+  int grid_rows_ = 15;
+  int grid_cols_ = 15;
+  int grid_height_ = 15;
 
   /**
    * @brief Setup the environment with obstacles and grid configuration
@@ -98,7 +98,7 @@ private:
   {
     // Set home GPS position (ETH Zurich coordinates from Python code)
     home_gps_ = GPSCoordinate(47.3977508, 8.5456074, 535.35);
-    home_grid_ = GridCoordinate(5, 5, 5);  // Center of 10x10x10 grid
+    home_grid_ = GridCoordinate(7, 7, 7);  // Center of 15x15x15 grid
     
     // Setup example obstacles (converted from GPS to grid coordinates)
     std::vector<GPSCoordinate> gps_obstacles = {

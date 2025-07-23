@@ -17,8 +17,8 @@ find_package(nav_msgs REQUIRED)
 find_package(builtin_interfaces REQUIRED)
 find_package(action_msgs REQUIRED)
 find_package(rosidl_default_generators REQUIRED)
-# Check if MAVROS is available
-find_package(mavros_msgs QUIET)
+# MAVROS is now installed - require it
+find_package(mavros_msgs REQUIRED)
 
 # Generate action and service interfaces
 rosidl_generate_interfaces(${PROJECT_NAME}
@@ -50,21 +50,15 @@ ament_target_dependencies(motion_coordinator
   nav_msgs
 )
 
-# Conditional build of full MAVROS drone control node
-if(mavros_msgs_FOUND)
-  message(STATUS "MAVROS found - building full drone control node")
-  add_executable(drone_control_node src/drone_control_node.cpp)
-  ament_target_dependencies(drone_control_node 
-    rclcpp 
-    rclcpp_components
-    geometry_msgs
-    mavros_msgs
-  )
-  rosidl_target_interfaces(drone_control_node ${PROJECT_NAME} "rosidl_typesupport_cpp")
-  install(TARGETS drone_control_node DESTINATION lib/${PROJECT_NAME})
-else()
-  message(WARNING "MAVROS not found - skipping full drone control node. Install with: sudo apt install ros-jazzy-mavros ros-jazzy-mavros-msgs")
-endif()
+# Full MAVROS drone control node (MAVROS is now installed)
+message(STATUS "Building full MAVROS drone control node")
+add_executable(drone_control_node src/drone_control_node.cpp)
+ament_target_dependencies(drone_control_node 
+  rclcpp 
+  rclcpp_components
+  geometry_msgs
+  mavros_msgs
+)
 
 # Simplified drone control node (without MAVROS dependency)
 add_executable(drone_control_node_simple src/drone_control_node_simple.cpp)
@@ -85,6 +79,7 @@ ament_target_dependencies(mock_mavros_service
 # Link action and service interfaces to executables
 rosidl_target_interfaces(movement_action_client ${PROJECT_NAME} "rosidl_typesupport_cpp")
 rosidl_target_interfaces(motion_coordinator ${PROJECT_NAME} "rosidl_typesupport_cpp")
+rosidl_target_interfaces(drone_control_node ${PROJECT_NAME} "rosidl_typesupport_cpp")
 rosidl_target_interfaces(drone_control_node_simple ${PROJECT_NAME} "rosidl_typesupport_cpp")
 rosidl_target_interfaces(mock_mavros_service ${PROJECT_NAME} "rosidl_typesupport_cpp")
 
@@ -92,6 +87,7 @@ rosidl_target_interfaces(mock_mavros_service ${PROJECT_NAME} "rosidl_typesupport
 install(TARGETS
   movement_action_client
   motion_coordinator
+  drone_control_node
   drone_control_node_simple
   mock_mavros_service
   DESTINATION lib/${PROJECT_NAME}
