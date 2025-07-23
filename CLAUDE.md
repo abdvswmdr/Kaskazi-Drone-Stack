@@ -105,6 +105,8 @@ fix(launch): correct DDS port configuration
 docs(readme): update installation instructions
 ```
 
+**Important**: Never include AI tool attribution in commits or code for public repositories. This is professional work.
+
 ### Pre-commit Checks
 ```bash
 # Format check

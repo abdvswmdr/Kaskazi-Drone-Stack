@@ -1,4 +1,4 @@
-:PROPERTIES:
+ :PROPERTIES:
 :ID:       kaskazi-drone-setup-2025-07-19
 :END:
 #+title: Kaskazi Drone Workspace Setup - ArduPilot-Gazebo-ROS2 Integration
