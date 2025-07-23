@@ -1,0 +1,9 @@
+# GetWaypoints Service Definition
+# This service allows the Motion Coordinator to send waypoints to the Drone Control Node
+
+# Request: List of waypoints to send to the drone
+geometry_msgs/Point[] waypoints  # Array of waypoint coordinates (x, y, z)
+---
+# Response: Confirmation of waypoint processing
+bool success         # True if waypoints were successfully processed and sent to MAVROS
+string message       # Descriptive message about the result

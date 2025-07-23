@@ -1,0 +1,18 @@
+# Movement Action Definition
+# This action allows sending movement goals in 3D space (x, y, z coordinates)
+# and receiving feedback about the progress and final result
+
+# Goal: Target coordinates for the drone to move to
+float64 x  # Target X coordinate (meters)
+float64 y  # Target Y coordinate (meters) 
+float64 z  # Target Z coordinate (meters)
+---
+# Result: Final outcome of the movement request
+bool success         # True if movement was successful, false otherwise
+string message       # Descriptive message about the result
+---
+# Feedback: Continuous updates during movement execution
+float64 current_x    # Current X position (meters)
+float64 current_y    # Current Y position (meters)
+float64 current_z    # Current Z position (meters)
+float64 progress     # Progress percentage (0.0 to 1.0)
