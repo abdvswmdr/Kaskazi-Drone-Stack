@@ -158,11 +158,10 @@ private:
     // Send the request to MAVROS
     auto future = mavros_waypoint_client_->async_send_request(request);
     
-    // Wait for the response (with timeout)
-    if (rclcpp::spin_until_future_complete(this->get_node_base_interface(), future, 
-                                          std::chrono::seconds(5)) == 
-        rclcpp::FutureReturnCode::SUCCESS) {
-      
+    // Wait for the response using future.wait_for() to avoid executor conflict
+    auto status = future.wait_for(std::chrono::seconds(5));
+    
+    if (status == std::future_status::ready) {
       auto response = future.get();
       
       if (response->success) {
@@ -175,7 +174,7 @@ private:
         return false;
       }
     } else {
-      RCLCPP_ERROR(this->get_logger(), "Failed to send waypoints to MAVROS - timeout");
+      RCLCPP_ERROR(this->get_logger(), "Failed to send waypoints to MAVROS - timeout or failure");
       return false;
     }
   }

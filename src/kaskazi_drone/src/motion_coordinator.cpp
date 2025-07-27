@@ -307,11 +307,10 @@ private:
     // Send the request
     auto future = waypoint_client_->async_send_request(request);
     
-    // Wait for the response (with timeout)
-    if (rclcpp::spin_until_future_complete(this->get_node_base_interface(), future, 
-                                          std::chrono::seconds(10)) == 
-        rclcpp::FutureReturnCode::SUCCESS) {
-      
+    // Wait for the response using future.wait_for() to avoid executor conflict
+    auto status = future.wait_for(std::chrono::seconds(10));
+    
+    if (status == std::future_status::ready) {
       auto response = future.get();
       
       if (response->success) {
@@ -326,7 +325,7 @@ private:
         return false;
       }
     } else {
-      RCLCPP_ERROR(this->get_logger(), "Failed to send waypoints to Drone Control - timeout");
+      RCLCPP_ERROR(this->get_logger(), "Failed to send waypoints to Drone Control - timeout or failure");
       return false;
     }
   }
