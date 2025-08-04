@@ -3,6 +3,19 @@ build/
 install/
 log/
 CLAUDE.md
+check_mavros_services.py
+prompt_software_framework.org
+test_arming.py
+test_px4_integration.py
+test_simple_arming.py
+test_step_by_step.sh
+
+src/ardupilot_gazebo/
+src/crazyflie_gazebo/
+src/kaskazi_drone/samples/
+src/px4_msgs/
+src/px4_ros_com/
+
 
 # Python
 __pycache__/
