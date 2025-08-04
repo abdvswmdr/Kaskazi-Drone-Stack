@@ -1,0 +1,31 @@
+# MAVROS Configuration Parameters for PX4 Integration
+# This file configures the MAVROS node to communicate with PX4 autopilot
+
+mavros:
+  ros__parameters: {}
+
+mavros_router:
+  ros__parameters: {}
+
+mavros_node:
+  ros__parameters:
+    # FCU connection URL - UDP connection to PX4 SITL
+    fcu_url: "udp://:14540@127.0.0.1:14557"
+    
+    # System ID for this MAVLink system
+    system_id: 255
+    
+    # Component ID for this MAVLink component  
+    component_id: 240
+    
+    # Target system ID (PX4 autopilot)
+    target_system_id: 1
+    
+    # Target component ID (autopilot component)
+    target_component_id: 1
+    
+    # Frame ID for coordinate transformations
+    frame_id: "map"
+    
+    # FCU frame ID for local coordinates
+    fcu_frame_id: "base_link_frd"

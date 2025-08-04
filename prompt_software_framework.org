@@ -4,8 +4,6 @@ only have the urdf and we made like an empty world.
 Using Gazebo sim (Harmonic) , ROS2 Jazzy and in Ubuntu 24.04
 we wanna use this kinda architecture
 
-img
-
 Branch: astar-mavros-sim
 Goal: Test ROS2 Jazzy on Ubuntu 24.04 using Gazebo Harmonic with the new Crazyflie drone (URDF ready, empty world).
 

@@ -73,7 +73,8 @@ def generate_launch_description():
                     'bash', '-c',
                     'cd ~/PX4-Autopilot && '
                     'PX4_SYS_AUTOSTART=4001 PX4_GZ_MODEL=x500 '
-                    'PX4_GZ_WORLD_FILE=/home/abdvswmdr/kaskazi_ws/src/kaskazi_drone/worlds/empty.sdf make px4_sitl gz_x500'
+                    #   'PX4_GZ_WORLD_FILE=/home/abdvswmdr/kaskazi_ws/src/kaskazi_drone/worlds/empty.sdf make px4_sitl gz_x500'
+                    'PX4_GZ_WORLD=walls make px4_sitl gz_x500'
                 ],
                 name='px4_sitl',
                 output='screen',

@@ -1,0 +1,213 @@
+:PROPERTIES:
+:ID:       d07b11ae-6b95-428e-92dd-53fb2d5143ba
+:END:
+#+title: gz-urdf-spawning
+#+FILETAGS: :gazebo:ros2:urdf:simulation:spawning:debugging:
+
+** The Right Way to Spawn Custom URDF Models in Gazebo Harmonic
+
+After debugging model spawning issues, here's the proven approach that actually works, based on successful implementations.
+
+** Critical Environment Setup
+The most important step that's often missed - Gazebo needs to know where to find your package resources:
+
+#+BEGIN_SRC python
+# In your launch file - ESSENTIAL for mesh loading
+import os
+from ament_index_python.packages import get_package_share_directory
+
+pkg_name = get_package_share_directory('your_package')
+gazebo_models_path, ignore_last_dir = os.path.split(pkg_name)
+
+# This line is CRITICAL - without it meshes won't load
+if "GZ_SIM_RESOURCE_PATH" in os.environ:
+    os.environ["GZ_SIM_RESOURCE_PATH"] += os.pathsep + gazebo_models_path
+else:
+    os.environ["GZ_SIM_RESOURCE_PATH"] = gazebo_models_path
+#+END_SRC
+
+** Correct Spawning Method: Use robot_description Topic
+The key insight: spawn via ~robot_description~ topic, NOT direct file loading.
+
+#+BEGIN_SRC python
+# WRONG WAY - leads to mesh loading failures
+spawn_robot = Node(
+    package='ros_gz_sim',
+    executable='create',
+    arguments=[
+        '-name', 'robot_name',
+        '-file', urdf_file_path,  # This bypasses robot_state_publisher
+        '-x', '0', '-y', '0', '-z', '0.5'
+    ]
+)
+
+# RIGHT WAY - uses ROS2 pipeline properly  
+spawn_robot = Node(
+    package='ros_gz_sim', 
+    executable='create',
+    arguments=[
+        '-name', 'robot_name',
+        '-topic', 'robot_description',  # Key difference
+        '-x', '0', '-y', '0', '-z', '0.5'
+    ]
+)
+#+END_SRC
+
+** Robot State Publisher Configuration
+The robot_state_publisher must publish the URDF content correctly:
+
+#+BEGIN_SRC python
+from launch.substitutions import Command
+
+# Use Command to process URDF file
+robot_state_publisher = Node(
+    package='robot_state_publisher',
+    executable='robot_state_publisher', 
+    parameters=[
+        {'robot_description': Command(['cat', ' ', urdf_file_path])},
+        {'use_sim_time': True}
+    ]
+)
+
+# For xacro files, use:
+# {'robot_description': Command(['xacro', ' ', xacro_file_path])}
+#+END_SRC
+
+** URDF Mesh Path Requirements
+Use ~package://~ URIs - they work when environment is set correctly:
+
+#+BEGIN_SRC xml
+<!-- CORRECT - use package:// paths -->
+<visual>
+  <geometry>
+    <mesh filename="package://your_package/meshes/model.stl"/>
+  </geometry>
+</visual>
+
+<!-- Avoid absolute paths or file:// URIs in URDF -->
+#+END_SRC
+
+** Complete Working Launch File Structure
+Here's the proven template that works:
+
+#+BEGIN_SRC python
+import os
+from launch import LaunchDescription
+from launch.actions import TimerAction
+from launch.substitutions import Command
+from launch_ros.actions import Node
+from ament_index_python.packages import get_package_share_directory
+
+def generate_launch_description():
+    pkg_name = get_package_share_directory('your_package')
+    
+    # CRITICAL: Set resource path
+    gazebo_models_path, _ = os.path.split(pkg_name)
+    if "GZ_SIM_RESOURCE_PATH" in os.environ:
+        os.environ["GZ_SIM_RESOURCE_PATH"] += os.pathsep + gazebo_models_path
+    else:
+        os.environ["GZ_SIM_RESOURCE_PATH"] = gazebo_models_path
+    
+    urdf_file = os.path.join(pkg_name, 'urdf', 'model.urdf')
+    
+    # Start Gazebo
+    gazebo_server = ExecuteProcess(
+        cmd=['gz', 'sim', '-r', '-s', 'empty.sdf']
+    )
+    
+    gazebo_client = ExecuteProcess(
+        cmd=['gz', 'sim', '-g']
+    )
+    
+    # Robot state publisher
+    robot_state_publisher = Node(
+        package='robot_state_publisher',
+        executable='robot_state_publisher',
+        parameters=[
+            {'robot_description': Command(['cat', ' ', urdf_file])},
+            {'use_sim_time': True}
+        ]
+    )
+    
+    # Spawn robot via topic (not file)
+    spawn_robot = TimerAction(
+        period=3.0,
+        actions=[
+            Node(
+                package='ros_gz_sim',
+                executable='create',
+                arguments=[
+                    '-name', 'robot_name',
+                    '-topic', 'robot_description',  # Key part
+                    '-x', '0', '-y', '0', '-z', '0.5'
+                ]
+            )
+        ]
+    )
+    
+    return LaunchDescription([
+        gazebo_server,
+        gazebo_client, 
+        robot_state_publisher,
+        spawn_robot
+    ])
+#+END_SRC
+
+** Common Failure Patterns to Avoid
+~Direct file spawning~: Using `-file` argument bypasses the ROS2 pipeline and causes mesh loading failures.
+
+~Missing GZ_SIM_RESOURCE_PATH~: Without this environment variable, Gazebo cannot resolve ~package://~ URIs.
+
+~Wrong robot_description parameter~: Must use ~Command()~ to read file content, not just file path.
+
+~Timing issues~: Always use ~TimerAction~ to ensure Gazebo starts before spawning.
+
+** Debugging Mesh Loading Issues
+If you see errors like "Unable to find file with URI [model://package/meshes/file.stl]":
+
+#+BEGIN_SRC bash
+# Check if environment variable is set
+echo $GZ_SIM_RESOURCE_PATH
+
+# Verify robot_description is published
+ros2 topic echo /robot_description --once
+
+# Check if meshes are installed correctly
+ls /path/to/workspace/install/package/share/package/meshes/
+
+# Verify package path resolution
+ros2 pkg prefix package_name
+#+END_SRC
+
+** File Format Recommendations
+~DAE files~: Preferred format for Gazebo - contains materials and textures.
+~STL files~: Work but only contain geometry, no materials.
+~Mesh installation~: Ensure meshes are installed via CMakeLists.txt:
+
+#+BEGIN_SRC cmake
+install(DIRECTORY
+  meshes
+  urdf
+  launch
+  DESTINATION share/${PROJECT_NAME}/
+)
+#+END_SRC
+
+** Joint Configuration for Simulation
+For rotors and moving parts, use ~continuous~ joints, not ~revolute~ with zero limits:
+
+#+BEGIN_SRC xml
+<!-- CORRECT for rotors -->
+<joint name="rotor_joint" type="continuous">
+  <axis xyz="0 0 1"/>
+</joint>
+
+<!-- WRONG - limits movement -->
+<joint name="rotor_joint" type="revolute">
+  <limit lower="0" upper="0" effort="0" velocity="0"/>
+</joint>
+#+END_SRC
+
+=============================================================================
+** Related notes:
+This approach was validated by comparing with working implementations and resolves the common mesh loading failures in Gazebo Harmonic with ROS2 Jazzy.

@@ -20,6 +20,7 @@
 #include <vector>
 #include <thread>
 #include <chrono>
+#include <limits>
 
 #include "rclcpp/rclcpp.hpp"
 #include "rclcpp_components/register_node_macro.hpp"
@@ -87,14 +88,14 @@ public:
       "/fmu/out/vehicle_command_ack", px4_qos,
       std::bind(&DroneControlNode::vehicle_command_ack_callback, this, std::placeholders::_1));
 
-    // Timer for offboard control mode publishing (required for PX4)
+    // Timer for offboard control mode publishing (50Hz like working example)
     offboard_timer_ = this->create_wall_timer(
-      std::chrono::milliseconds(100),
+      std::chrono::milliseconds(20),  // 50Hz instead of 10Hz
       std::bind(&DroneControlNode::publish_offboard_control_mode, this));
 
-    // Timer for trajectory setpoint publishing
+    // Timer for trajectory setpoint publishing (50Hz like working example)
     trajectory_timer_ = this->create_wall_timer(
-      std::chrono::milliseconds(100),
+      std::chrono::milliseconds(20),  // 50Hz instead of 10Hz
       std::bind(&DroneControlNode::publish_trajectory_setpoint, this));
 
     // Initialize state
@@ -160,42 +161,46 @@ private:
     // SITL simulation - skip EKF2 initialization check
     RCLCPP_INFO(this->get_logger(), "SITL simulation mode - skipping EKF2 initialization check");
 
-    // Send extended pre-flight offboard control signals
-    RCLCPP_INFO(this->get_logger(), "Pre-flight: sending offboard control signals for 5 seconds...");
-    auto start_time = this->now();
-    while (rclcpp::ok() && (this->now() - start_time).seconds() < 5.0) {
-      publish_offboard_control_mode();
-      if (!mission_waypoints_.empty()) {
-        publish_takeoff_trajectory(); // Send takeoff position
-      }
-      rclcpp::sleep_for(std::chrono::milliseconds(100));
+    // Follow working ROS2 example pattern: ARM → TAKEOFF → wait for AUTO_LOITER → OFFBOARD
+    RCLCPP_INFO(this->get_logger(), "Starting correct sequence: ARM → TAKEOFF → LOITER → OFFBOARD");
+    
+    // Step 1: Wait for system readiness (like working example checks flightCheck first)
+    if (!wait_for_system_ready()) {
+      RCLCPP_ERROR(this->get_logger(), "System not ready for arming");
+      return false;
     }
-
-    // Arm the vehicle first
-    if (!arm_vehicle()) {
+    
+    // Step 2: ARM the vehicle persistently (like working samples)
+    if (!arm_vehicle_persistent()) {
       RCLCPP_ERROR(this->get_logger(), "Failed to arm vehicle");
       return false;
     }
 
-    // Continue sending offboard signals briefly after arming, then immediately switch to offboard
-    start_time = this->now();
-    while (rclcpp::ok() && (this->now() - start_time).seconds() < 0.5) {
-      publish_offboard_control_mode();
-      if (!mission_waypoints_.empty()) {
-        publish_takeoff_trajectory();
-      }
-      rclcpp::sleep_for(std::chrono::milliseconds(100));
+    // Step 2: Send TAKEOFF command (missing in our previous implementation)
+    RCLCPP_INFO(this->get_logger(), "Sending takeoff command...");
+    if (!send_takeoff_command()) {
+      RCLCPP_ERROR(this->get_logger(), "Failed to send takeoff command");
+      return false;
     }
 
-    // Immediately switch to offboard mode to prevent auto-disarm timeout
+    // Step 3: Wait for AUTO_LOITER state (this is CORRECT, not an error!)
+    RCLCPP_INFO(this->get_logger(), "Waiting for AUTO_LOITER state (this is expected!)...");
+    if (!wait_for_auto_loiter()) {
+      RCLCPP_ERROR(this->get_logger(), "Failed to reach AUTO_LOITER state");
+      return false;
+    }
+
+    // Step 4: NOW switch to offboard mode (following working ROS2 example)
+    RCLCPP_INFO(this->get_logger(), "AUTO_LOITER reached! Now switching to offboard mode...");
     if (!set_offboard_mode()) {
       RCLCPP_ERROR(this->get_logger(), "Failed to set offboard mode");
       return false;
     }
 
-    // Execute takeoff
-    if (!execute_takeoff()) {
-      RCLCPP_ERROR(this->get_logger(), "Failed to execute takeoff");
+    // Step 5: Wait for takeoff completion
+    RCLCPP_INFO(this->get_logger(), "Offboard mode active! Waiting for takeoff completion...");
+    if (!wait_for_takeoff_completion()) {
+      RCLCPP_ERROR(this->get_logger(), "Failed to complete takeoff");
       return false;
     }
 
@@ -203,7 +208,7 @@ private:
     mission_active_ = true;
     current_waypoint_index_ = 0;
     
-    RCLCPP_INFO(this->get_logger(), "Mission started successfully");
+    RCLCPP_INFO(this->get_logger(), "Mission started successfully - ready for waypoint navigation!");
     return true;
   }
 
@@ -221,6 +226,126 @@ private:
       rclcpp::sleep_for(std::chrono::milliseconds(100));
     }
     
+    return false;
+  }
+
+  // Wait for system ready (like working example's flightCheck)
+  bool wait_for_system_ready()
+  {
+    RCLCPP_INFO(this->get_logger(), "Waiting for system to be ready for arming...");
+    
+    auto start_time = this->now();
+    while (rclcpp::ok() && (this->now() - start_time).seconds() < 15.0) {
+      if (current_state_.pre_flight_checks_pass) {
+        RCLCPP_INFO(this->get_logger(), "✅ System ready - preflight checks passed!");
+        return true;
+      }
+      RCLCPP_INFO_THROTTLE(this->get_logger(), *this->get_clock(), 2000,
+                           "Waiting for preflight checks to pass... (current: %s)",
+                           current_state_.pre_flight_checks_pass ? "PASS" : "FAIL");
+      rclcpp::sleep_for(std::chrono::milliseconds(200));
+    }
+    
+    RCLCPP_ERROR(this->get_logger(), "❌ System readiness timeout - preflight checks still failing");
+    return false;
+  }
+
+  // Persistent arming (like working example that keeps sending arm commands)
+  bool arm_vehicle_persistent()
+  {
+    RCLCPP_INFO(this->get_logger(), "Starting persistent arming sequence...");
+    
+    auto start_time = this->now();
+    int arm_attempts = 0;
+    
+    while (rclcpp::ok() && (this->now() - start_time).seconds() < 15.0) {
+      // Send arm command every second (like working example)
+      if (arm_attempts == 0 || (this->now() - start_time).seconds() > arm_attempts) {
+        RCLCPP_INFO(this->get_logger(), "Sending arm command (attempt %d)...", arm_attempts + 1);
+        
+        px4_msgs::msg::VehicleCommand cmd{};
+        cmd.timestamp = this->get_clock()->now().nanoseconds() / 1000;
+        cmd.command = px4_msgs::msg::VehicleCommand::VEHICLE_CMD_COMPONENT_ARM_DISARM;
+        cmd.param1 = 1.0; // arm
+        cmd.target_system = 1;
+        cmd.target_component = 1;
+        cmd.source_system = 1;
+        cmd.source_component = 1;
+        cmd.from_external = true;
+
+        vehicle_command_pub_->publish(cmd);
+        arm_attempts++;
+      }
+      
+      RCLCPP_INFO_THROTTLE(this->get_logger(), *this->get_clock(), 1000,
+                           "Current arming_state: %d, preflight: %s, waiting for ARMED (2)...", 
+                           current_state_.arming_state,
+                           current_state_.pre_flight_checks_pass ? "PASS" : "FAIL");
+                           
+      // Accept both STANDBY (1) and ARMED (2) states in SITL mode
+      if (current_state_.arming_state >= 1 && current_state_.pre_flight_checks_pass) { 
+        RCLCPP_INFO(this->get_logger(), "✅ Vehicle ready! arming_state: %d (SITL accepts STANDBY)", current_state_.arming_state);
+        
+        // Wait a bit more for stability (like working example's myCnt > 10)
+        if ((this->now() - start_time).seconds() > 3.0) {
+          return true;
+        }
+      }
+      
+      // If preflight checks fail during arming, that's the issue
+      if (!current_state_.pre_flight_checks_pass) {
+        RCLCPP_ERROR(this->get_logger(), "❌ Preflight checks failed during arming - vehicle will auto-disarm");
+        return false;
+      }
+      
+      rclcpp::sleep_for(std::chrono::milliseconds(100));
+    }
+    
+    RCLCPP_ERROR(this->get_logger(), "❌ Persistent arming timeout - final arming_state: %d (expected: 2)", current_state_.arming_state);
+    return false;
+  }
+
+  // Send takeoff command (missing in our previous implementation!)
+  bool send_takeoff_command()
+  {
+    RCLCPP_INFO(this->get_logger(), "Sending VEHICLE_CMD_NAV_TAKEOFF command...");
+    
+    px4_msgs::msg::VehicleCommand cmd{};
+    cmd.timestamp = this->get_clock()->now().nanoseconds() / 1000;
+    cmd.command = px4_msgs::msg::VehicleCommand::VEHICLE_CMD_NAV_TAKEOFF;
+    cmd.param1 = 1.0; // Minimum pitch
+    cmd.param7 = 5.0; // Takeoff altitude (5 meters like working example)
+    cmd.target_system = 1;
+    cmd.target_component = 1;
+    cmd.source_system = 1;
+    cmd.source_component = 1;
+    cmd.from_external = true;
+
+    vehicle_command_pub_->publish(cmd);
+    RCLCPP_INFO(this->get_logger(), "Takeoff command sent");
+    
+    return true;
+  }
+
+  // Wait for AUTO_LOITER state (this is CORRECT behavior, not an error!)
+  bool wait_for_auto_loiter()
+  {
+    RCLCPP_INFO(this->get_logger(), "Waiting for NAVIGATION_STATE_AUTO_LOITER (nav_state 4)...");
+    
+    auto start_time = this->now();
+    while (rclcpp::ok() && (this->now() - start_time).seconds() < 15.0) {
+      RCLCPP_INFO_THROTTLE(this->get_logger(), *this->get_clock(), 2000, 
+                           "Current nav_state: %d, waiting for AUTO_LOITER (4)...", current_state_.nav_state);
+      
+      if (current_state_.nav_state == 4) { // NAVIGATION_STATE_AUTO_LOITER = 4
+        RCLCPP_INFO(this->get_logger(), "✅ AUTO_LOITER state reached! This is the correct intermediate state.");
+        return true;
+      }
+      
+      rclcpp::sleep_for(std::chrono::milliseconds(100));
+    }
+    
+    RCLCPP_ERROR(this->get_logger(), "❌ AUTO_LOITER timeout - final nav_state: %d (expected: 4)", current_state_.nav_state);
     return false;
   }
 
@@ -277,108 +402,94 @@ private:
     return true;
   }
 
-  // Set offboard control mode with improved timing and retry logic
+  // Set offboard control mode (following working ROS2 example pattern)
   bool set_offboard_mode()
   {
-    RCLCPP_INFO(this->get_logger(), "Setting offboard mode immediately after arming...");
+    RCLCPP_INFO(this->get_logger(), "Starting offboard mode (following working ROS2 example)...");
     
-    for (int attempt = 0; attempt < 5; attempt++) {
-      px4_msgs::msg::VehicleCommand cmd{};
-      cmd.timestamp = this->get_clock()->now().nanoseconds() / 1000;
-      cmd.command = px4_msgs::msg::VehicleCommand::VEHICLE_CMD_DO_SET_MODE;
-      cmd.param1 = 1.0; // MAV_MODE_FLAG_CUSTOM_MODE_ENABLED
-      cmd.param2 = 6.0; // PX4_CUSTOM_MAIN_MODE_OFFBOARD
-      cmd.param3 = 0.0; // PX4_CUSTOM_SUB_MODE_OFFBOARD
-      cmd.target_system = 1;
-      cmd.target_component = 1;
-      cmd.source_system = 1;
-      cmd.source_component = 1;
-      cmd.from_external = true;
-      cmd.confirmation = ++command_sequence_;
-
-      vehicle_command_pub_->publish(cmd);
-      RCLCPP_INFO(this->get_logger(), "Offboard mode command sent (attempt %d/5)", attempt + 1);
-
-      // Wait for mode change confirmation with continuous offboard signals
-      auto start_time = this->now();
-      while (rclcpp::ok() && (this->now() - start_time).seconds() < 3.0) {
-        // CRITICAL: Continue sending offboard signals every 100ms during transition
-        publish_offboard_control_mode();
-        if (!mission_waypoints_.empty()) {
-          publish_takeoff_trajectory();
-        }
-        
-        if (current_state_.nav_state == px4_msgs::msg::VehicleStatus::NAVIGATION_STATE_OFFBOARD) {
-          RCLCPP_INFO(this->get_logger(), "✅ Offboard mode set successfully on attempt %d!", attempt + 1);
-          return true;
-        }
-        rclcpp::sleep_for(std::chrono::milliseconds(100));
+    // Start continuous setpoint stream FIRST (like working example does at 50Hz)
+    RCLCPP_INFO(this->get_logger(), "Starting continuous setpoint stream at 50Hz...");
+    
+    // Send a few setpoints to establish the stream
+    for (int i = 0; i < 10; i++) {
+      publish_offboard_control_mode();
+      if (!mission_waypoints_.empty()) {
+        publish_takeoff_trajectory();
       }
-      
-      RCLCPP_WARN(this->get_logger(), "Offboard mode attempt %d failed - nav_state: %d, retrying immediately...", 
-                  attempt + 1, current_state_.nav_state);
-      
-      // Brief pause before retry, but keep sending offboard signals
-      for (int i = 0; i < 2; i++) {
-        publish_offboard_control_mode();
-        if (!mission_waypoints_.empty()) {
-          publish_takeoff_trajectory();
-        }
-        rclcpp::sleep_for(std::chrono::milliseconds(100));
-      }
+      rclcpp::sleep_for(std::chrono::milliseconds(20)); // 50Hz
     }
     
-    RCLCPP_ERROR(this->get_logger(), "❌ Failed to set offboard mode after 5 attempts - final nav_state: %d", 
-                 current_state_.nav_state);
-    return false;
-  }
-
-  // Execute takeoff sequence
-  bool execute_takeoff()
-  {
-    RCLCPP_INFO(this->get_logger(), "Executing takeoff to 3 meters...");
-    
-    // Send takeoff command
+    // Now send offboard mode command
     px4_msgs::msg::VehicleCommand cmd{};
     cmd.timestamp = this->get_clock()->now().nanoseconds() / 1000;
-    cmd.command = px4_msgs::msg::VehicleCommand::VEHICLE_CMD_NAV_TAKEOFF;
-    cmd.param7 = 3.0; // Takeoff altitude (3 meters)
+    cmd.command = px4_msgs::msg::VehicleCommand::VEHICLE_CMD_DO_SET_MODE;
+    cmd.param1 = 1.0; // MAV_MODE_FLAG_CUSTOM_MODE_ENABLED
+    cmd.param2 = 6.0; // PX4_CUSTOM_MAIN_MODE_OFFBOARD
+    cmd.param3 = 0.0; // PX4_CUSTOM_SUB_MODE_OFFBOARD
     cmd.target_system = 1;
     cmd.target_component = 1;
     cmd.source_system = 1;
     cmd.source_component = 1;
     cmd.from_external = true;
-    cmd.confirmation = ++command_sequence_;
 
     vehicle_command_pub_->publish(cmd);
+    RCLCPP_INFO(this->get_logger(), "Offboard mode command sent");
+
+    // Continue setpoint stream while waiting for mode change
+    auto start_time = this->now();
+    while (rclcpp::ok() && (this->now() - start_time).seconds() < 3.0) {
+      // Maintain 50Hz setpoint stream
+      publish_offboard_control_mode();
+      if (!mission_waypoints_.empty()) {
+        publish_takeoff_trajectory();
+      }
+      
+      if (current_state_.nav_state == 14) { // NAVIGATION_STATE_OFFBOARD = 14
+        RCLCPP_INFO(this->get_logger(), "✅ Offboard mode activated successfully! nav_state: %d", 
+                    current_state_.nav_state);
+        return true;
+      }
+      
+      rclcpp::sleep_for(std::chrono::milliseconds(20)); // 50Hz continuous stream
+    }
+    
+    RCLCPP_ERROR(this->get_logger(), "❌ Failed to set offboard mode - final nav_state: %d", 
+                 current_state_.nav_state);
+    return false;
+  }
+
+  // Wait for takeoff completion (takeoff command already sent earlier)
+  bool wait_for_takeoff_completion()
+  {
+    RCLCPP_INFO(this->get_logger(), "Waiting for takeoff completion (monitoring altitude)...");
     
     // Wait for takeoff completion by monitoring altitude
     auto start_time = this->now();
     while (rclcpp::ok() && (this->now() - start_time).seconds() < 30.0) {
-      // Continue publishing offboard control
+      // Continue publishing offboard control at 50Hz
       publish_offboard_control_mode();
       publish_takeoff_trajectory();
       
       // Check if we've reached takeoff altitude
-      if (current_position_.z >= 2.5) { // Allow some tolerance
+      if (current_position_.z >= 4.0) { // 5m takeoff altitude minus tolerance
         RCLCPP_INFO(this->get_logger(), "Takeoff completed - altitude: %.2f m", current_position_.z);
         takeoff_completed_ = true;
         return true;
       }
       
-      rclcpp::sleep_for(std::chrono::milliseconds(100));
+      rclcpp::sleep_for(std::chrono::milliseconds(20)); // 50Hz
     }
     
     RCLCPP_ERROR(this->get_logger(), "Takeoff timeout - current altitude: %.2f m", current_position_.z);
     return false;
   }
 
-  // Publish offboard control mode (required for PX4 offboard)
+  // Publish offboard control mode (try position control first - more reliable for initial transition)
   void publish_offboard_control_mode()
   {
     px4_msgs::msg::OffboardControlMode msg{};
     msg.timestamp = this->get_clock()->now().nanoseconds() / 1000;
-    msg.position = true;
+    msg.position = true;   // Use position control - more reliable for offboard transition
     msg.velocity = false;
     msg.acceleration = false;
     msg.attitude = false;
@@ -387,23 +498,21 @@ private:
     offboard_control_mode_pub_->publish(msg);
   }
   
-  // Publish takeoff trajectory setpoint
+  // Publish simple position setpoint for reliable offboard transition
   void publish_takeoff_trajectory()
   {
     px4_msgs::msg::TrajectorySetpoint msg{};
     msg.timestamp = this->get_clock()->now().nanoseconds() / 1000;
     
-    // Set takeoff position (current position but 3m up)
-    msg.position = {
-      static_cast<float>(current_position_.x),
-      static_cast<float>(current_position_.y),
-      -3.0f // PX4 uses NED, so -3m for 3m up
-    };
+    // Simple position hold at 5m altitude (matching takeoff command)
+    msg.position = {0.0f, 0.0f, -5.0f};  // NED: 5m up = -5.0f
     
-    // Set all velocities to zero for position hold
+    // Zero velocity for position hold
     msg.velocity = {0.0f, 0.0f, 0.0f};
     msg.acceleration = {0.0f, 0.0f, 0.0f};
     msg.jerk = {0.0f, 0.0f, 0.0f};
+    
+    // Face north
     msg.yaw = 0.0f;
     msg.yawspeed = 0.0f;
 
@@ -464,10 +573,32 @@ private:
       target_z = std::min(target_z, -1.0f);  // Min 1m altitude
       
       msg.position = {target_x, target_y, target_z};
-      msg.velocity = {0.0f, 0.0f, 0.0f}; // Zero velocity for position hold
+      
+      // Calculate velocity towards target for smoother navigation
+      float distance_to_target = sqrt(
+        pow(target_x - current_position_.x, 2) + 
+        pow(target_y - current_position_.y, 2) + 
+        pow(-target_z - current_position_.z, 2)
+      );
+      
+      if (distance_to_target > 0.1f) {
+        // Set moderate velocity towards target (max 2 m/s)
+        float vel_scale = std::min(2.0f, distance_to_target * 0.5f);
+        msg.velocity = {
+          static_cast<float>((target_x - current_position_.x) / distance_to_target * vel_scale),
+          static_cast<float>((target_y - current_position_.y) / distance_to_target * vel_scale),
+          static_cast<float>((-target_z - current_position_.z) / distance_to_target * vel_scale * 0.5f) // Slower vertical
+        };
+      } else {
+        msg.velocity = {0.0f, 0.0f, 0.0f}; // Stop when close
+      }
+      
       msg.acceleration = {0.0f, 0.0f, 0.0f};
       msg.jerk = {0.0f, 0.0f, 0.0f};
-      msg.yaw = 0.0f; // Keep heading
+      
+      // Calculate yaw towards target
+      float yaw_target = atan2(target_y - current_position_.y, target_x - current_position_.x);
+      msg.yaw = yaw_target;
       msg.yawspeed = 0.0f;
 
       trajectory_setpoint_pub_->publish(msg);

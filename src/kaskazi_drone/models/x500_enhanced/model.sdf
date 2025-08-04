@@ -1,0 +1,139 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<sdf version='1.9'>
+  <model name='x500_enhanced'>
+    <!-- Include the base x500 model from PX4 -->
+    <include merge='true'>
+      <uri>model://x500</uri>
+    </include>
+    
+    <!-- Enhanced sensor configuration for better EKF2 performance -->
+    <!-- The base x500 already includes: IMU, GPS/NAVSAT, magnetometer, barometer -->
+    
+    <!-- Add optical flow sensor for better position estimation indoors -->
+    <link name="optical_flow_link">
+      <pose relative_to="base_link">0 0 -0.12 0 1.5708 0</pose>
+      <inertial>
+        <mass>0.015</mass>
+        <inertia>
+          <ixx>0.0001</ixx>
+          <ixy>0</ixy>
+          <ixz>0</ixz>
+          <iyy>0.0001</iyy>
+          <iyz>0</iyz>
+          <izz>0.0001</izz>
+        </inertia>
+      </inertial>
+      <visual name="optical_flow_visual">
+        <geometry>
+          <box>
+            <size>0.02 0.02 0.008</size>
+          </box>
+        </geometry>
+        <material>
+          <diffuse>0.2 0.2 0.2 1.0</diffuse>
+        </material>
+      </visual>
+      <sensor name="opt_flow_sensor" type="camera">
+        <always_on>1</always_on>
+        <update_rate>100</update_rate>
+        <camera>
+          <horizontal_fov>1.5</horizontal_fov>
+          <image>
+            <width>64</width>
+            <height>64</height>
+          </image>
+          <clip>
+            <near>0.1</near>
+            <far>100</far>
+          </clip>
+        </camera>
+        <plugin filename="gz-sim-optical-flow-system" name="gz::sim::systems::OpticalFlow">
+          <output_rate>100</output_rate>
+          <noise_mean>0.0</noise_mean>
+          <noise_stddev>0.01</noise_stddev>
+        </plugin>
+      </sensor>
+    </link>
+    
+    <joint name="optical_flow_joint" type="fixed">
+      <parent>base_link</parent>
+      <child>optical_flow_link</child>
+    </joint>
+    
+    <!-- Add range sensor for ground distance measurement -->
+    <link name="range_sensor_link">
+      <pose relative_to="base_link">0 0 -0.1 0 1.5708 0</pose>
+      <inertial>
+        <mass>0.01</mass>
+        <inertia>
+          <ixx>0.0001</ixx>
+          <ixy>0</ixy>
+          <ixz>0</ixz>
+          <iyy>0.0001</iyy>
+          <iyz>0</iyz>
+          <izz>0.0001</izz>
+        </inertia>
+      </inertial>
+      <visual name="range_sensor_visual">
+        <geometry>
+          <cylinder>
+            <radius>0.008</radius>
+            <length>0.015</length>
+          </cylinder>
+        </geometry>
+        <material>
+          <diffuse>0.1 0.1 0.1 1.0</diffuse>
+        </material>
+      </visual>
+      <sensor name="range_sensor" type="gpu_lidar">
+        <always_on>1</always_on>
+        <update_rate>50</update_rate>
+        <lidar>
+          <scan>
+            <horizontal>
+              <samples>1</samples>
+              <resolution>1</resolution>
+              <min_angle>0</min_angle>
+              <max_angle>0</max_angle>
+            </horizontal>
+            <vertical>
+              <samples>1</samples>
+              <resolution>1</resolution>
+              <min_angle>0</min_angle>
+              <max_angle>0</max_angle>
+            </vertical>
+          </scan>
+          <range>
+            <min>0.05</min>
+            <max>35.0</max>
+            <resolution>0.01</resolution>
+          </range>
+          <noise>
+            <type>gaussian</type>
+            <mean>0.0</mean>
+            <stddev>0.01</stddev>
+          </noise>
+        </lidar>
+      </sensor>
+    </link>
+    
+    <joint name="range_sensor_joint" type="fixed">
+      <parent>base_link</parent>
+      <child>range_sensor_link</child>
+    </joint>
+    
+    <!-- Enhanced sensor processing plugins -->
+    <plugin filename="gz-sim-sensors-system" name="gz::sim::systems::Sensors">
+      <render_engine>ogre2</render_engine>
+    </plugin>
+    
+    <!-- PX4 integration plugin for DDS communication -->
+    <plugin filename="gz-sim-px4-integration-system" name="gz::sim::systems::Px4Integration">
+      <gazebo_namespace></gazebo_namespace>
+      <model_name>x500_enhanced</model_name>
+      <autostart_id>4001</autostart_id>
+      <enable_lockstep>true</enable_lockstep>
+      <enable_dds>true</enable_dds>
+    </plugin>
+  </model>
+</sdf>

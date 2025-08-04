@@ -1,0 +1,352 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Enhanced Crazyflie URDF with Gazebo flight control and MAVROS bridge -->
+<robot name="crazyflie_mavros">
+  
+  <!-- Base Link -->
+  <link name="base_link">
+    <inertial>
+      <origin xyz="-2.63791012241991E-05 -0.000268052705446983 0.00191074112200795" rpy="0 0 0" />
+      <mass value="0.025" />
+      <inertia
+        ixx="16.571710E-06"
+        ixy="0.830806E-06"
+        ixz="0.718277E-06"
+        iyy="16.655602E-06"
+        iyz="1.800197E-06"
+        izz="29.261652E-06" />
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://kaskazi_drone/crazyflie/meshes/base_link.STL" />
+      </geometry>
+      <material name="white">
+        <color rgba="1 1 1 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <box size="0.10 0.10 0.035" />
+      </geometry>
+    </collision>
+  </link>
+
+  <!-- Rotor 1 Link (Front Right) -->
+  <link name="rotor_1_link">
+    <inertial>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <mass value="0.0008" />
+      <inertia
+        ixx="8.33333E-09"
+        ixy="0"
+        ixz="0"
+        iyy="1.08333E-07"
+        iyz="0"
+        izz="1.13333E-07" />
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://kaskazi_drone/crazyflie/meshes/rotor_1_link.STL" />
+      </geometry>
+      <material name="dark_grey">
+        <color rgba="0.10196 0.10196 0.10196 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <cylinder radius="0.02" length="0.005" />
+      </geometry>
+    </collision>
+  </link>
+
+  <joint name="rotor_1_joint" type="continuous">
+    <origin xyz="0.031643 -0.031643 0.01385" rpy="0 0 0" />
+    <parent link="base_link" />
+    <child link="rotor_1_link" />
+    <axis xyz="0 0 1" />
+  </joint>
+
+  <!-- Rotor 2 Link (Front Left) -->
+  <link name="rotor_2_link">
+    <inertial>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <mass value="0.0008" />
+      <inertia
+        ixx="8.33333E-09"
+        ixy="0"
+        ixz="0"
+        iyy="1.08333E-07"
+        iyz="0"
+        izz="1.13333E-07" />
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://kaskazi_drone/crazyflie/meshes/rotor_2_link.STL" />
+      </geometry>
+      <material name="dark_grey">
+        <color rgba="0.10196 0.10196 0.10196 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <cylinder radius="0.02" length="0.005" />
+      </geometry>
+    </collision>
+  </link>
+
+  <joint name="rotor_2_joint" type="continuous">
+    <origin xyz="-0.031643 -0.031643 0.01385" rpy="0 0 0" />
+    <parent link="base_link" />
+    <child link="rotor_2_link" />
+    <axis xyz="0 0 1" />
+  </joint>
+
+  <!-- Rotor 3 Link (Back Left) -->
+  <link name="rotor_3_link">
+    <inertial>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <mass value="0.0008" />
+      <inertia
+        ixx="8.33333E-09"
+        ixy="0"
+        ixz="0"
+        iyy="1.08333E-07"
+        iyz="0"
+        izz="1.13333E-07" />
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://kaskazi_drone/crazyflie/meshes/rotor_3_link.STL" />
+      </geometry>
+      <material name="dark_grey">
+        <color rgba="0.10196 0.10196 0.10196 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <cylinder radius="0.02" length="0.005" />
+      </geometry>
+    </collision>
+  </link>
+
+  <joint name="rotor_3_joint" type="continuous">
+    <origin xyz="0.031643 0.031643 0.01385" rpy="0 0 0" />
+    <parent link="base_link" />
+    <child link="rotor_3_link" />
+    <axis xyz="0 0 1" />
+  </joint>
+
+  <!-- Rotor 4 Link (Back Right) -->
+  <link name="rotor_4_link">
+    <inertial>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <mass value="0.0008" />
+      <inertia
+        ixx="8.33333E-09"
+        ixy="0"
+        ixz="0"
+        iyy="1.08333E-07"
+        iyz="0"
+        izz="1.13333E-07" />
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://kaskazi_drone/crazyflie/meshes/rotor_4_link.STL" />
+      </geometry>
+      <material name="dark_grey">
+        <color rgba="0.10196 0.10196 0.10196 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <cylinder radius="0.02" length="0.005" />
+      </geometry>
+    </collision>
+  </link>
+
+  <joint name="rotor_4_joint" type="continuous">
+    <origin xyz="-0.031643 0.031643 0.01385" rpy="0 0 0" />
+    <parent link="base_link" />
+    <child link="rotor_4_link" />
+    <axis xyz="0 0 1" />
+  </joint>
+
+  <!-- Gazebo Plugins -->
+  
+  <!-- Individual Motor Control Plugins -->
+  <gazebo>
+    <plugin filename="gz-sim-multicopter-motor-model-system" 
+            name="gz::sim::systems::MulticopterMotorModel">
+      <robotNamespace>crazyflie</robotNamespace>
+      <jointName>rotor_1_joint</jointName>
+      <linkName>rotor_1_link</linkName>
+      <turningDirection>ccw</turningDirection>
+      <maxRotVelocity>2618</maxRotVelocity>
+      <motorConstant>1.28192e-08</motorConstant>
+      <momentConstant>0.005964552</momentConstant>
+      <rotorDragCoefficient>8.06428e-05</rotorDragCoefficient>
+      <rollingMomentCoefficient>0.0000001</rollingMomentCoefficient>
+      <rotorVelocitySlowdownSim>20</rotorVelocitySlowdownSim>
+      <actuator_number>0</actuator_number>
+      <motorType>velocity</motorType>
+    </plugin>
+
+    <plugin filename="gz-sim-multicopter-motor-model-system" 
+            name="gz::sim::systems::MulticopterMotorModel">
+      <robotNamespace>crazyflie</robotNamespace>
+      <jointName>rotor_2_joint</jointName>
+      <linkName>rotor_2_link</linkName>
+      <turningDirection>cw</turningDirection>
+      <maxRotVelocity>2618</maxRotVelocity>
+      <motorConstant>1.28192e-08</motorConstant>
+      <momentConstant>0.005964552</momentConstant>
+      <rotorDragCoefficient>8.06428e-05</rotorDragCoefficient>
+      <rollingMomentCoefficient>0.0000001</rollingMomentCoefficient>
+      <rotorVelocitySlowdownSim>20</rotorVelocitySlowdownSim>
+      <actuator_number>1</actuator_number>
+      <motorType>velocity</motorType>
+    </plugin>
+
+    <plugin filename="gz-sim-multicopter-motor-model-system" 
+            name="gz::sim::systems::MulticopterMotorModel">
+      <robotNamespace>crazyflie</robotNamespace>
+      <jointName>rotor_3_joint</jointName>
+      <linkName>rotor_3_link</linkName>
+      <turningDirection>ccw</turningDirection>
+      <maxRotVelocity>2618</maxRotVelocity>
+      <motorConstant>1.28192e-08</motorConstant>
+      <momentConstant>0.005964552</momentConstant>
+      <rotorDragCoefficient>8.06428e-05</rotorDragCoefficient>
+      <rollingMomentCoefficient>0.0000001</rollingMomentCoefficient>
+      <rotorVelocitySlowdownSim>20</rotorVelocitySlowdownSim>
+      <actuator_number>2</actuator_number>
+      <motorType>velocity</motorType>
+    </plugin>
+
+    <plugin filename="gz-sim-multicopter-motor-model-system" 
+            name="gz::sim::systems::MulticopterMotorModel">
+      <robotNamespace>crazyflie</robotNamespace>
+      <jointName>rotor_4_joint</jointName>
+      <linkName>rotor_4_link</linkName>
+      <turningDirection>cw</turningDirection>
+      <maxRotVelocity>2618</maxRotVelocity>
+      <motorConstant>1.28192e-08</motorConstant>
+      <momentConstant>0.005964552</momentConstant>
+      <rotorDragCoefficient>8.06428e-05</rotorDragCoefficient>
+      <rollingMomentCoefficient>0.0000001</rollingMomentCoefficient>
+      <rotorVelocitySlowdownSim>20</rotorVelocitySlowdownSim>
+      <actuator_number>3</actuator_number>
+      <motorType>velocity</motorType>
+    </plugin>
+
+    <!-- Joint Position Controller for testing -->
+    <plugin filename="gz-sim-joint-position-controller-system" 
+            name="gz::sim::systems::JointPositionController">
+      <joint_name>rotor_1_joint</joint_name>
+      <topic>crazyflie/rotor_1_cmd</topic>
+    </plugin>
+    
+    <plugin filename="gz-sim-joint-position-controller-system" 
+            name="gz::sim::systems::JointPositionController">
+      <joint_name>rotor_2_joint</joint_name>
+      <topic>crazyflie/rotor_2_cmd</topic>
+    </plugin>
+    
+    <plugin filename="gz-sim-joint-position-controller-system" 
+            name="gz::sim::systems::JointPositionController">
+      <joint_name>rotor_3_joint</joint_name>
+      <topic>crazyflie/rotor_3_cmd</topic>
+    </plugin>
+    
+    <plugin filename="gz-sim-joint-position-controller-system" 
+            name="gz::sim::systems::JointPositionController">
+      <joint_name>rotor_4_joint</joint_name>
+      <topic>crazyflie/rotor_4_cmd</topic>
+    </plugin>
+
+    <!-- Odometry Publisher Plugin -->
+    <plugin filename="gz-sim-odometry-publisher-system" 
+            name="gz::sim::systems::OdometryPublisher">
+      <dimensions>3</dimensions>
+      <odom_frame>odom</odom_frame>
+      <robot_base_frame>base_link</robot_base_frame>
+      <odom_topic>/odom</odom_topic>
+    </plugin>
+
+    <!-- IMU Plugin -->
+    <plugin filename="gz-sim-imu-system" 
+            name="gz::sim::systems::Imu">
+    </plugin>
+
+    <!-- Joint State Publisher Plugin -->
+    <plugin filename="gz-sim-joint-state-publisher-system"
+            name="gz::sim::systems::JointStatePublisher">
+      <topic>/joint_states</topic>
+    </plugin>
+  </gazebo>
+
+  <!-- Gazebo reference materials -->
+  <gazebo reference="base_link">
+    <material>Gazebo/White</material>
+  </gazebo>
+  
+  <gazebo reference="rotor_1_link">
+    <material>Gazebo/DarkGrey</material>
+  </gazebo>
+  
+  <gazebo reference="rotor_2_link">
+    <material>Gazebo/DarkGrey</material>
+  </gazebo>
+  
+  <gazebo reference="rotor_3_link">
+    <material>Gazebo/DarkGrey</material>
+  </gazebo>
+  
+  <gazebo reference="rotor_4_link">
+    <material>Gazebo/DarkGrey</material>
+  </gazebo>
+
+  <!-- IMU Link for sensor -->
+  <link name="imu_link">
+    <inertial>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <mass value="0.001" />
+      <inertia
+        ixx="1e-06"
+        ixy="0"
+        ixz="0"
+        iyy="1e-06"
+        iyz="0"
+        izz="1e-06" />
+    </inertial>
+  </link>
+
+  <joint name="imu_joint" type="fixed">
+    <origin xyz="0 0 0" rpy="0 0 0" />
+    <parent link="base_link" />
+    <child link="imu_link" />
+  </joint>
+
+  <!-- IMU Sensor Definition -->
+  <gazebo reference="imu_link">
+    <sensor name="imu_sensor" type="imu">
+      <always_on>true</always_on>
+      <update_rate>1000.0</update_rate>
+      <pose>0 0 0 0 0 0</pose>
+      <plugin filename="gz-sim-imu-system" name="gz::sim::systems::Imu">
+        <initial_orientation_as_reference>false</initial_orientation_as_reference>
+        <topic>/imu</topic>
+      </plugin>
+    </sensor>
+  </gazebo>
+
+</robot>

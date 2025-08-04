@@ -18,6 +18,7 @@
 #include <memory>
 #include <thread>
 #include <vector>
+#include <cmath>
 
 #include "kaskazi_drone/action/movement.hpp"
 #include "kaskazi_drone/astar_planner.hpp"
@@ -191,10 +192,16 @@ private:
                 goal->x, goal->y, goal->z);
     
     // Convert target coordinates to GPS and then to grid
+    // More accurate local to GPS conversion for Zurich area (latitude ~47.4°)
+    // 1 degree latitude ≈ 111,000 meters globally
+    // 1 degree longitude ≈ 111,000 * cos(latitude) meters
+    double lat_conversion = 1.0 / 111000.0;  // meters to degrees latitude
+    double lon_conversion = 1.0 / (111000.0 * cos(home_gps_.latitude * M_PI / 180.0));  // meters to degrees longitude
+    
     GPSCoordinate target_gps(
-      home_gps_.latitude + (goal->x * (1.0 / 111000.0)),  // Rough conversion
-      home_gps_.longitude + (goal->y * (1.0 / 74000.0)),  // Rough conversion
-      home_gps_.altitude + goal->z
+      home_gps_.latitude + (goal->x * lat_conversion),   // North (X) -> Latitude
+      home_gps_.longitude + (goal->y * lon_conversion),  // East (Y) -> Longitude  
+      home_gps_.altitude + goal->z                       // Up (Z) -> Altitude
     );
     
     GridCoordinate start_grid = home_grid_;  // Start from home position
@@ -254,18 +261,30 @@ private:
                 "Path planning successful! Generated %zu waypoints",
                 gps_waypoints.size());
     
-    // Convert GPS waypoints to geometry_msgs::Point for the service
+    // Convert GPS waypoints to local coordinates (meters) for the drone control node
     std::vector<geometry_msgs::msg::Point> waypoint_points;
     for (const auto& gps_coord : gps_waypoints) {
       geometry_msgs::msg::Point point;
-      point.x = gps_coord.latitude;
-      point.y = gps_coord.longitude;
-      point.z = gps_coord.altitude;
+      
+      // Convert GPS to local coordinates in meters (relative to home position)
+      // Latitude difference -> North/South distance (X)
+      // Longitude difference -> East/West distance (Y)
+      double lat_diff = gps_coord.latitude - home_gps_.latitude;
+      double lon_diff = gps_coord.longitude - home_gps_.longitude;
+      
+      // Convert degrees to meters
+      // 1 degree latitude ≈ 111,000 meters
+      // 1 degree longitude ≈ 111,000 * cos(latitude) meters
+      point.x = lat_diff * 111000.0; // North (meters)
+      point.y = lon_diff * 111000.0 * cos(home_gps_.latitude * M_PI / 180.0); // East (meters)
+      point.z = gps_coord.altitude; // Keep altitude as is
+      
       waypoint_points.push_back(point);
       
       RCLCPP_INFO(this->get_logger(),
-                  "Waypoint %zu: lat=%.7f, lon=%.7f, alt=%.2f",
-                  waypoint_points.size() - 1, point.x, point.y, point.z);
+                  "Waypoint %zu: local(%.2f, %.2f, %.2f) from GPS(%.7f, %.7f, %.2f)",
+                  waypoint_points.size() - 1, point.x, point.y, point.z,
+                  gps_coord.latitude, gps_coord.longitude, gps_coord.altitude);
     }
 
     // Send waypoints to Drone Control Node
