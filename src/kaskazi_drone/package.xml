@@ -21,18 +21,17 @@
   <depend>nav_msgs</depend>
   <depend>action_msgs</depend>
 
-  <!-- MAVROS Dependencies -->
-  <depend>mavros</depend>
-  <depend>mavros_msgs</depend>
+  <!-- PX4 Native DDS Dependencies -->
+  <depend>px4_msgs</depend>
+  <depend>px4_ros_com</depend>
   
   <!-- Action Interface Generation -->
   <build_depend>rosidl_default_generators</build_depend>
   <exec_depend>rosidl_default_runtime</exec_depend>
   <member_of_group>rosidl_interface_packages</member_of_group>
 
-  <!-- ArduPilot DDS Integration -->
+  <!-- XRCE-DDS Integration -->
   <depend>builtin_interfaces</depend>
-  <depend>micro_ros_agent</depend>
   
   <!-- Gazebo Integration -->
   <depend>gazebo_ros_pkgs</depend>
